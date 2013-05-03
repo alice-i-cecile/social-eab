@@ -5,7 +5,7 @@ library(ggplot2)
 
 # Wrapper for ode simulation of EAB models ####
 
-sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab_factory, ...){
+sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab1_factory, min_rates="auto", max_tries=1, ...){
   
   # initial_df is a dataframe of starting values 
   # variables by column and site by row
@@ -15,11 +15,38 @@ sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab_factor
   # Create the reduced function to use
   ode_func <- factory(...)
   
-  # Run the simulation
-  raw_out <- ode(y=initial_list, times=times, func=ode_func)
+  # Run the simulation until state variables stabilize
+  STABLE <- FALSE 
+  state <- data.frame(time=0, t(initial_list))
+  tries <- 0
+  
+  while (!STABLE & tries < max_tries){    
+    # Extract the most recent state of the system
+    initial_state <- state [nrow(state), ]
+    
+    # Extend the length of time the model stretches
+    max_time <- initial_state$time
+    run_times <- times + max_time
+  
+    # Format the initial state for ode engine
+    initial_state <- unlist(initial_state[names(initial_state)!="time"])
+  
+    # Run the model from the most recent state
+    new_state <- as.data.frame(ode(y=initial_state, times=run_times, func=ode_func))
+      
+    # Combine the old and new results
+    # Truncate the repeated row
+    state <- rbind (state, new_state[-1,])  
+    
+    # Test for stability
+    STABLE <- const_stability(state, min_rates)
+    
+    # Update counter for # of tries
+    tries <- tries + 1
+  }
   
   # Process the output for pretty graphing
-  melt_out <- melt (as.data.frame(raw_out), id.vars="time")
+  melt_out <- melt (as.data.frame(state), id.vars="time")
   
   var_list <- melt_out$variable
   
@@ -28,21 +55,59 @@ sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab_factor
   melt_out$var <- substr(var_list, 1,1)
   melt_out$site <- substr(var_list, 2, max(nchar(as.character(var_list))))
   
-  return (melt_out)
+  return (list(melt=melt_out, state=state))
   
 }
 
 # Plotting functions ####
 
+# A clean variable x site plot
 sim_facet_plot <- function(melt_out){
-  my_plot <- ggplot (melt_out, aes(x=time, y=value, colour=var))+geom_line()+facet_wrap(var~site, scales="free_y")+theme_bw()
+  my_plot <- ggplot (melt_out, aes(x=time, y=value, colour=var))+geom_line(size=1)+facet_grid(site~var, scales="free_y")+guides(colour=FALSE)+xlab("Time")+ylab("Value")+theme_bw()
   return(my_plot)
 }
 
-# Testing ####
-initial_test <- data.frame (S=c(1), I=c(0), L=c(1))
-times_test <- seq(from=0, to=1, by=0.1)
+# Testing for convergence ####
 
+const_stability <- function (state, min_rates="auto"){
+  if (min_rates[1]=="auto"){
+    time_step <- state$time[2]-state$time[1]
+    
+    ranges <- sapply(state[names(state)!="time"], range)
+    ranges <- ranges[2,] - ranges[1,]
+    
+    # Set the sensitivity in proportion to the range of the variable divided by the time step
+    sens_const <- 0.0001
+    
+    min_rates <-  sens_const*ranges/time_step      
+  }
+  
+  # Linearly interpolate first derivative
+  diff_state <- sapply(state, diff)
+  
+  rates <- diff_state[, colnames(diff_state)!="time"]/diff_state[,"time"]
+  
+  # Check whether rates are below the minimum threshold
+  rate_test <- t(apply(rates, MARGIN=1, FUN=function(x){abs(x)<=min_rates}))
+  
+  # Lazy rule of thumb: if final rate is subthreshold, we can presume system is in equilibrium
+  stable <- rate_test[nrow(rate_test),]
+  
+  
+  # Status updates
+  max_time <- 
+    print (paste0("Time ", max(state$time), ": stability testing for an approximate constant state"))
+  print (stable)
+  
+  # If all states are stable, we can conclude the simulation
+  return (all(stable))
+  
+}
 
-foo <- sim (initial_test, times_test)
-print(sim_facet_plot(foo))
+# Phase diagrams ####
+
+# Determining phase of EAB models ####
+
+phase_eab <- function(state){
+  return ("infested")  
+}
