@@ -2,6 +2,7 @@
 library(deSolve)
 library(reshape2)
 library(ggplot2)
+source("phase_diagrams.R")
 
 # Wrapper for ode simulation of EAB models ####
 
@@ -46,25 +47,10 @@ sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab1_facto
   }
   
   # Process the output for pretty graphing
-  melt_out <- melt (as.data.frame(state), id.vars="time")
+  melt_out <- melt_ode_out(state)
   
-  var_list <- melt_out$variable
+  return (list(state=state, melt=melt_out))
   
-  # Relies on [A-Z][0-9]* naming conventions
-  # Variable (1 character) followed by site number
-  melt_out$var <- substr(var_list, 1,1)
-  melt_out$site <- substr(var_list, 2, max(nchar(as.character(var_list))))
-  
-  return (list(melt=melt_out, state=state))
-  
-}
-
-# Plotting functions ####
-
-# A clean variable x site plot
-sim_facet_plot <- function(melt_out){
-  my_plot <- ggplot (melt_out, aes(x=time, y=value, colour=var))+geom_line(size=1)+facet_grid(site~var, scales="free_y")+guides(colour=FALSE)+xlab("Time")+ylab("Value")+theme_bw()
-  return(my_plot)
 }
 
 # Testing for convergence ####
@@ -104,10 +90,27 @@ const_stability <- function (state, min_rates="auto"){
   
 }
 
-# Phase diagrams ####
+# Plotting functions ####
 
-# Determining phase of EAB models ####
-
-phase_eab <- function(state){
-  return ("infested")  
+# Process the output for pretty graphing
+melt_ode_out <- function (state){
+  melt_out <- melt (as.data.frame(state), id.vars="time")
+  
+  var_list <- melt_out$variable
+  
+  # Relies on [A-Z][0-9]* naming conventions
+  # Variable (1 character) followed by site number
+  melt_out$var <- substr(var_list, 1,1)
+  melt_out$site <- substr(var_list, 2, max(nchar(as.character(var_list))))
+  
+  return (melt_out)
 }
+
+
+
+# A clean variable x site plot
+sim_facet_plot <- function(melt_out){
+  my_plot <- ggplot (melt_out, aes(x=time, y=value, colour=var))+geom_line(size=1)+facet_grid(site~var, scales="free_y")+guides(colour=FALSE)+xlab("Time")+ylab("Value")+theme_bw()
+  return(my_plot)
+}
+
