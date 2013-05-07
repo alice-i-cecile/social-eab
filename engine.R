@@ -6,13 +6,13 @@ source("phase_diagrams.R")
 
 # Wrapper for ode simulation of EAB models ####
 
-sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab1_factory, min_rates="auto", max_tries=1, ...){
+sim <- function(initial_df, times=seq(from=0, to=10, by=0.1), factory=eab_factory, min_rates="auto", max_tries=1, ...){
   
   # initial_df is a dataframe of starting values 
   # variables by column and site by row
   # e.g. initial_df <- data.frame (S=c(0.9,1,1), I=c(0.1, 0, 0), L=c(0,0,0))
   initial_list <- unlist(initial_df)
-  
+    
   # Create the reduced function to use
   ode_func <- factory(...)
   
@@ -81,8 +81,7 @@ const_stability <- function (state, min_rates="auto"){
   
   
   # Status updates
-  max_time <- 
-    print (paste0("Time ", max(state$time), ": stability testing for an approximate constant state"))
+  print (paste0("Time ", max(state$time), ": stability testing for an approximate constant state"))
   print (stable)
   
   # If all states are stable, we can conclude the simulation
