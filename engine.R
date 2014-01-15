@@ -2,6 +2,7 @@
 library(deSolve)
 library(reshape2)
 library(ggplot2)
+library(plyr)
 source("phase_diagrams.R")
 
 # Wrapper for ode simulation of EAB models ####
